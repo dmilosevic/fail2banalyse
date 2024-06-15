@@ -71,13 +71,13 @@ yyyymmdd_fail2ban_log_analysis_summary.txt text summary of key results
 yyyymmdd_fail2ban_raw_attacker_info.txt - raw JSON results of ipinfo.io lookup - this may also be used as an input to avoid re-running lookup
 usernames.txt - (if valid uncompressed auth*/secure* logs found in input log directory, SSH only) a list of invalid usernames used in failed SSH access attempts.
 ```
-(note country / coordinate info will not be available if nolookup option is used to prevent ipinfo.io lookups)
+(note country / coordinate info will not be available if nolookup option is used to prevent ipwho.is lookups)
 (note usernames analysis is based purely on number of occurences of username in log with string "invalid user", and will not match up to number of occurences in fail2ban logs)
 
 
 ## Dependencies
 
-- ipinfo.io is used for geolocation of IP addresseses.  If calling _fail2ban_analyse.py_ a command line argument can be used to specify an existing results file from a previous lookup, or skip look-up altogether (with reduced functionality).  Requests to ipinfo.io API are subject to their terms of use and limits on number of lookups - paid plans are required for heavier use.
+- ipwho.is is used for geolocation of IP addresseses.  If calling _fail2ban_analyse.py_ a command line argument can be used to specify an existing results file from a previous lookup, or skip look-up altogether (with reduced functionality).  Requests to ipwho.is API are subject to their terms of use and limits on number of lookups - paid plans are required for heavier use. Free plan rate limit is 10k requests/month.
 - Mapbox API key is required if using Mapbox (_attacker-map.html_).  You can obtain this for free by signing up with Mapbox.  Openstreetmap version (_attacker-map-openstreetmap.html_) does not require this.
 - CDNs are used for Leaflet and OMS, for a fully locally hosted version simply download leaflet (leaflet.js, leaflet.css and images directory) and OMS (oms.min.js) and edit the html accordingly
 - a favicon is referenced at _favicon.ico_ in same directory as the map html files but not supplied and may be added if required
@@ -91,7 +91,7 @@ For example adding to cron `10 6 * * 0 /usr/local/bin/fail2ban_analyse_wrapper.s
 ## References
 
 - http://www.fail2ban.org/
-- https://ipinfo.io/
+- https://ipwhois.io
 - https://leafletjs.com/
 - https://www.mapbox.com/
 - https://www.openstreetmap.org/
