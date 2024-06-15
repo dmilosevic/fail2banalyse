@@ -7,7 +7,7 @@
 # All arguments are optional
 # If <directory> is not specified default '/var/log/'
 # If <number of logs> is not specified default all available (fail2ban.log* in <directory>)
-# If <Raw attacker info filepath> is not specified, code looks up info using ipinfo.io (note this takes some time and is limited by ipinfo.io terms of service) and creates and saves raw attacker info file. Set to "nolookup" to disable geolocation and simply analyse attacker IPs only
+# If <Raw attacker info filepath> is not specified, code looks up info using ipwho.is (note this takes some time and is limited by ipwho.is terms of service) and creates and saves raw attacker info file. Set to "nolookup" to disable geolocation and simply analyse attacker IPs only
 # Log naming convention - fail2ban.log; fail2ban.log.1; fail2ban.log.2.gz; etc (Debian based) or fail2ban.log; fail2ban.log-YYYYMMDD; fail2ban.log-YYYYMMDD.gz; etc (Fedora/RHEL/CentOS)
 # IMPORTANT - log file directory must not contain any files of the form fail2ban.log* which are not valid logs!
 
@@ -50,6 +50,8 @@ import subprocess
 from time import sleep, gmtime, strftime
 import time
 from collections import Counter
+import re
+import json
 
 print (strftime("%Y-%m-%d_%H:%M:%S: Starting fail2ban log analysis", gmtime()))
 start_time=time.time()
@@ -300,20 +302,21 @@ plt.savefig(filename_stub+"_attacks_per_day_bar.png", format='png', dpi=300)
 # Country look-up
 if len(sys.argv) < 4:
   # No raw attack info file specified, do look-up
-  print("Querying ipinfo.io for origin of all attacking IPs - THIS MAY TAKE SOME TIME!")
+  print("Querying ipwho.is for origin of all attacking IPs - THIS MAY TAKE SOME TIME!")
   attacker_info_filename = filename_stub+"_raw_attacker_info.txt"
   f = open(attacker_info_filename, "w")
   for line in IP_unique:
-    attacker_ele = subprocess.check_output("curl -s ipinfo.io/%s/geo" % line, shell=True)
+    attacker_ele = subprocess.check_output("curl -s ipwho.is/%s?fields=ip,country_code,latitude,longitude" % line, shell=True)
     attacker_ele = attacker_ele.decode()
     if "Rate limit exceeded" in attacker_ele:
-      print("WARNING: ipinfo look-up allowance exceeded - try later or subscribe to paid service")
-      print("See terms of service at ipinfo.io")
+      print("WARNING: ipwho.is look-up allowance exceeded - try later or subscribe to paid service")
+      print("See terms of service at ipwhois.io")
       print("Abandoning IP geolocation lookup")
       break
+    attacker_ele = json.dumps(json.loads(attacker_ele), indent=2)
     f.write(attacker_ele)
   f.close
-  print("Completed ipinfo lookup - raw attacker info written to %s" % attacker_info_filename)
+  print("Completed ipwho.is lookup - raw attacker info written to %s" % attacker_info_filename)
 elif sys.argv[3] == "nolookup":
   print("WARNING: IP info country look-up disabled, selected analysis complete, exiting...")
   print(strftime("%Y-%m-%d_%H:%M:%S: All tasks completed, exiting fail2ban log analysis", gmtime()))
@@ -334,7 +337,7 @@ attacker_info_lons = []
 with open(attacker_info_filename) as f:
   for line in f:
     if "Rate limit exceeded" in line and warning_flag == 0:
-      print("WARNING: ipinfo look-up allowance was exceeded - try tomorrow or subscribe to paid service - Note max free ipinfo look-ups is 1000 per day")
+      print("WARNING: ipwho.is look-up allowance was exceeded - try tomorrow or subscribe to paid service - Note max free ipwho.is look-ups is 10000 per month")
       warning_flag = 1
     split_line = line.split("\"")
     if "\"ip\":" in line:
@@ -342,20 +345,24 @@ with open(attacker_info_filename) as f:
         attacker_info_IPs.append(split_line[3])
       else:
         attacker_info_IPs.append("")
-    if "\"country\":" in line:
+    elif "\"country_code\":" in line:
       if not "null" in line:
         attacker_info_countries.append(split_line[3])
       else:
         attacker_info_countries.append("")
-    if "\"loc\":" in line:
+    elif "\"latitude\":" in line:
       if not "null" in line:
-        locs = split_line[3].split(",")
-        attacker_info_lats.append(locs[0])
-        attacker_info_lons.append(locs[1])
+        lat = re.search(r'-?\d+.\d+', line).group()
+        attacker_info_lats.append(lat)
       else:
         attacker_info_lats.append("")
+    elif "\"longitude\":" in line:
+      if not "null" in line:
+        lon = re.search(r'-?\d+.\d+', line).group()
+        attacker_info_lons.append(lon)
+      else:
         attacker_info_lons.append("")
-    if "\"bogon\": true" in line or  ("\"ip\":" in lastline and "}{" in line):
+    elif "\"bogon\": true" in line or  ("\"ip\":" in lastline and "}{" in line):
       # Private or BOGON IP, or no data
       attacker_info_countries.append("")
       attacker_info_lats.append("")
@@ -370,7 +377,7 @@ lon_lookup_count = len(attacker_info_lons)-attacker_info_lons.count("")
 print("Searched info for %d IPs: found %d IP addresses, %d countries, %d lats and %d lons" % \
   (len(IP_unique), IP_lookup_count, country_lookup_count, lat_lookup_count, lon_lookup_count))
 
-# If ipinfo lookup has consistent number of results with query, update results with location info and # attacks (yyyymmdd_fail2ban_attack_IPs_unique.csv - including geolocation)
+# If ipwho.is lookup has consistent number of results with query, update results with location info and # attacks (yyyymmdd_fail2ban_attack_IPs_unique.csv - including geolocation)
 if (len(IP_unique) == len(attacker_info_IPs) and len(IP_unique) == len(attacker_info_countries)) and len(IP_unique) == len(attacker_info_lats):
   print("Updating log of all UNIQUE attack IPs in %s to include location info" % IP_unique_filename)
   f = open(IP_unique_filename, "w")
